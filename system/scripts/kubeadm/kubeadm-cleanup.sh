@@ -1,7 +1,7 @@
 #!/bin/bash
 echo "Removing docker kubeadm kubelet kubectl"
 echo
-read -p "Do you want to purge kubelet kubectl and docker [Y/n]" deb_remove_option
+read -p "Do you want to purge kubelet kubectl and docker [Y/n]:" deb_remove_option
 echo
 
 sudo kubeadm reset
