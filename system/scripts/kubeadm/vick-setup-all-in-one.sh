@@ -1,0 +1,222 @@
+#!/bin/bash
+# ------------------------------------------------------------------------
+#
+# Copyright 2018 WSO2, Inc. (http://wso2.com)
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License
+#
+# ------------------------------------------------------------------------
+
+function deploy_mysql_server () {
+
+    #Create folders required by the mysql PVC
+    if [ -d /mnt/mysql ]; then
+        sudo mv /mnt/mysql "/mnt/mysql.$(date +%s)"
+    fi
+    sudo mkdir -p /mnt/mysql
+    #Change the folder ownership to mysql server user.
+    sudo chown 999:999 /mnt/mysql
+
+    kubectl create configmap mysql-dbscripts --from-file=mysql/dbscripts/ -n vick-system
+    kubectl apply -f mysql-persistent-volumes-local.yaml -n vick-system
+    kubectl apply -f mysql-persistent-volume-claim.yaml -n vick-system
+    kubectl apply -f mysql-deployment.yaml -n vick-system
+    #Wait till the mysql deployment availability
+    kubectl wait deployment/wso2apim-with-analytics-mysql-deployment --for condition=available --timeout=6000s -n vick-system
+    kubectl apply -f mysql-service.yaml -n vick-system
+}
+
+function deploy_global_gw () {
+
+    #Create folders required by the APIM GW PVC
+    if [ -d /mnt/apim_repository_deployment_server ]; then
+        sudo mv /mnt/apim_repository_deployment_server "/mnt/apim_repository_deployment_server.$(date +%s)"
+    fi
+    #Create folders required by the APIM PVC
+    sudo mkdir -p /mnt/apim_repository_deployment_server
+    sudo chown 802:802 /mnt/apim_repository_deployment_server
+
+    #Create the gw config maps
+    kubectl create configmap gw-conf --from-file=apim-configs/gw -n vick-system
+    kubectl create configmap gw-conf-datasources --from-file=apim-configs/gw/datasources/ -n vick-system
+    #Create KM config maps
+    kubectl create configmap conf-identity --from-file=apim-configs/gw/identity -n vick-system
+    kubectl create configmap apim-template --from-file=apim-configs/gw/resources/api_templates -n vick-system
+    kubectl create configmap apim-tomcat --from-file=apim-configs/gw/tomcat -n vick-system
+    kubectl create configmap apim-security --from-file=apim-configs/gw/security -n vick-system
+    #Create apim local volumes and volume claims
+    kubectl apply -f vick-apim-persistent-volumes-local.yaml -n vick-system
+    kubectl apply -f vick-apim-persistent-volume-claim-local.yaml -n vick-system
+    #Create gateway deployment and the service
+    kubectl apply -f vick-apim-gw.yaml -n vick-system
+    #Create gateway ingress
+    kubectl apply -f vick-apim-gw-ingress.yaml -n vick-system
+}
+
+function init_control_plane () {
+    #Setup VICK namespace, create service account and the docker registry credentials
+    kubectl apply -f vick-ns-init.yaml
+
+    HOST_NAME=$(hostname | tr '[:upper:]' '[:lower:]')
+    #label the node
+    kubectl label nodes $HOST_NAME disk=local
+
+    #Create credentials for docker.wso2.com
+    #kubectl create secret docker-registry wso2creds --docker-server=docker.wso2.com --docker-username=$DOCKER_REG_USER --docker-password=$DOCKER_REG_PASSWD --docker-email=$DOCKER_REG_USER_EMAIL -n vick-system
+}
+
+function deploy_istio () {
+    wget https://github.com/istio/istio/releases/download/1.0.2/istio-1.0.2-linux.tar.gz
+    tar -xzvf istio-1.0.2-linux.tar.gz
+
+    ISTIO_HOME=istio-1.0.2
+    export PATH=$ISTIO_HOME/bin:$PATH
+    kubectl apply -f $ISTIO_HOME/install/kubernetes/helm/istio/templates/crds.yaml
+    #kubectl apply -f $ISTIO_HOME/install/kubernetes/istio-demo.yaml
+    #kubectl apply -f $ISTIO_HOME/install/kubernetes/istio-demo-auth.yaml
+    kubectl apply -f istio-demo-vick.yaml
+    kubectl wait deployment/istio-pilot --for condition=available --timeout=6000s -n istio-system
+    #Enabling Istio injection
+    kubectl label namespace default istio-injection=enabled
+}
+
+function deploy_vick_crds () {
+    #Install VICK crds
+    kubectl apply -f vick.yaml
+}
+
+function create_artifact_folder () {
+
+ if [ -d tmp-vick ]; then
+        mv tmp-vick "tmp-vick.$(date +%s)"
+    fi
+
+    mkdir tmp-vick
+}
+function download_vick_artifacts () {
+
+    base_url=$1
+    yaml_list=("$@")
+
+    for file_path in "${yaml_list[@]}"
+    do
+      dir_name=""
+      if [[ $file_path =~ / ]]; then
+        dir_name=${file_path%/*}
+      fi
+      wget "$base_url/$file_path" -P "tmp-vick/$dir_name" -a vick-setup.log
+    done
+}
+
+#-----------------------------------------------------------------------------------------------------------------------
+
+control_plane_base_url="https://raw.githubusercontent.com/wso2/product-vick/master/system/control-plane/global"
+
+#    "https://raw.githubusercontent.com/wso2/product-vick/master/system/control-plane/global"
+#    "https://raw.githubusercontent.com/wso2/product-vick/master/build/target"
+
+
+control_plane_yaml=(
+    "mysql-deployment.yaml"
+    "mysql-persistent-volume-claim.yaml"
+    "mysql-persistent-volumes-local.yaml"
+    "mysql-persistent-volumes.yaml"
+    "mysql-service.yaml"
+    "nfs-deployment.yaml"
+    "nfs-persistent-volume-claim.yaml"
+    "nfs-persistent-volumes-local.yaml"
+    "nfs-server-service.yaml"
+    "vick-apim-gw-ingress.yaml"
+    "vick-apim-gw.yaml"
+    "vick-apim-persistent-volume-claim-local.yaml"
+    "vick-apim-persistent-volume-claim.yaml"
+    "vick-apim-persistent-volumes-local.yaml"
+    "vick-apim-persistent-volumes.yaml"
+    "vick-apim-pub-store-ingress.yaml"
+    "vick-apim-pub-store.yaml"
+    "vick-ns-init.yaml"
+    "vick-sp-dashboard-deployment.yaml"
+    "vick-sp-dashboard-ingress.yaml"
+    "vick-sp-dashboard-service.yaml"
+    "vick-sp-persistent-volumes.yaml"
+    "vick-sp-worker-deployment.yaml"
+    "vick-sp-worker-service.yaml"
+    "apim-configs/gw/datasources/master-datasources.xml"
+    "apim-configs/gw/user-mgt.xml"
+    "apim-configs/gw/identity/identity.xml"
+    "apim-configs/gw/tomcat/catalina-server.xml"
+    "apim-configs/gw/carbon.xml"
+    "apim-configs/gw/security/Owasp.CsrfGuard.Carbon.properties"
+    "apim-configs/gw/registry.xml"
+    "apim-configs/gw/resources/api_templates/velocity_template.xml"
+    "apim-configs/gw/api-manager.xml"
+    "apim-configs/gw/log4j.properties"
+    "apim-configs/pub-store/datasources/master-datasources.xml"
+    "apim-configs/pub-store/user-mgt.xml"
+    "apim-configs/pub-store/identity/identity.xml"
+    "apim-configs/pub-store/carbon.xml"
+    "apim-configs/pub-store/registry.xml"
+    "apim-configs/pub-store/resources/api_templates/velocity_template.xml"
+    "apim-configs/pub-store/api-manager.xml"
+    "apim-configs/pub-store/log4j.properties"
+    "mysql/dbscripts/init.sql"
+    "vick.yaml"
+)
+
+crd_base_url="https://raw.githubusercontent.com/wso2/product-vick/master/build/target"
+crd_yaml=("vick.yaml")
+
+#-----------------------------------------------------------------------------------------------------------------------
+#Create temporary foldr to download vick artifacts
+create_artifact_folder
+
+echo
+echo "Downloading vick artifacts"
+echo
+
+download_vick_artifacts $control_plane_base_url "${control_plane_yaml[@]}"
+
+download_vick_artifacts $crd_base_url "${crd_yaml[@]}"
+
+#Init control plane
+echo
+echo "Creating vick-system namespace and the service account"
+echo
+
+init_control_plane
+
+echo
+read -p "Do you want to deploy MySQL server in to vick-system namespace [Y/n]: " deploy_mysql_server
+echo
+
+if [ $deploy_mysql_server == "Y" ]; then
+    install_mysql_server
+fi
+
+echo
+echo "Deploying the control plane API Manager"
+echo
+
+deploy_global_gw
+
+echo
+echo "Deploying Istio"
+echo
+
+deploy_istio
+
+echo
+echo "Deploy vick crds"
+echo
+
+deploy_vick_crds
