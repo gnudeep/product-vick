@@ -65,6 +65,24 @@ function deploy_global_gw () {
     kubectl apply -f ${download_location}/vick-apim-gw-ingress.yaml -n vick-system
 }
 
+function deploy_sp_dashboard_worker () {
+    download_location=$1
+    #Create SP worker configmaps
+    kubectl create configmap sp-worker-siddhi --from-file==${download_location}/sp-worker/siddhi -n vick-system
+    kubectl create configmap sp-worker-conf --from-file==${download_location}/sp-worker/conf -n vick-system
+    kubectl create configmap sp-worker-bin --from-file==${download_location}/sp-worker/bin -n vick-system
+    #Create SP worker deployment
+    kubectl apply -f vick-sp-worker-deployment.yaml -n vick-system
+    kubectl apply -f vick-sp-worker-service.yaml -n vick-system
+    #Create SP dashboard configmaps
+    kubectl create configmap sp-dashboard-conf --from-file==${download_location}/status-dashboard/conf -n vick-system
+    #kubectl create configmap sp-worker-bin --from-file=sp-worker/bin -n vick-system
+    #Create SP status dashboard deployment
+    kubectl apply -f vick-sp-dashboard-deployment.yaml -n vick-system
+    kubectl apply -f vick-sp-dashboard-service.yaml -n vick-system
+    #Create SP dashboard ingress
+    kubectl apply -f vick-sp-dashboard-ingress.yaml -n vick-system
+}
 function init_control_plane () {
     download_location=$1
     #Setup VICK namespace, create service account and the docker registry credentials
@@ -171,8 +189,12 @@ control_plane_yaml=(
     "apim-configs/pub-store/resources/api_templates/velocity_template.xml"
     "apim-configs/pub-store/api-manager.xml"
     "apim-configs/pub-store/log4j.properties"
+    "sp-worker/bin/carbon.sh"
+    "sp-worker/siddhi/tracer-app.siddhi"
+    "sp-worker/siddhi/telemetry-app.siddhi"
+    "sp-worker/conf/deployment.yaml"
+    "status-dashboard//conf/deployment.yaml"
     "mysql/dbscripts/init.sql"
-    "vick.yaml"
 )
 
 crd_base_url="https://raw.githubusercontent.com/wso2/product-vick/master/build/target"
@@ -188,9 +210,7 @@ download_path="tmp-wso2"
 #Create temporary foldr to download vick artifacts
 create_artifact_folder $download_path
 
-echo
 echo "Downloading vick artifacts"
-echo
 
 download_vick_artifacts $control_plane_base_url $download_path "${control_plane_yaml[@]}"
 
@@ -199,37 +219,28 @@ download_vick_artifacts $crd_base_url  $download_path "${crd_yaml[@]}"
 download_vick_artifacts $istio_base_url $download_path "${istio_yaml[@]}"
 
 #Init control plane
-echo
 echo "Creating vick-system namespace and the service account"
-echo
 
 init_control_plane $download_path
 
-echo
 read -p "Do you want to deploy MySQL server in to vick-system namespace [Y/n]: " install_mysql
-echo
 
 if [ $install_mysql == "Y" ]; then
     deploy_mysql_server $download_path
 fi
 
-#Wait for mysql server start up and schema creation
-sleep 60
-
-echo
 echo "Deploying the control plane API Manager"
-echo
 
 deploy_global_gw $download_path
 
-echo
+echo "Deploying SP"
+
+deploy_sp_dashboard_worker $download_path
+
 echo "Deploying Istio"
-echo
 
 deploy_istio $download_path
 
-echo
 echo "Deploy vick crds"
-echo
 
 deploy_vick_crds $download_path
