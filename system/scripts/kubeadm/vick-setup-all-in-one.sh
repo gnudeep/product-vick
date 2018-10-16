@@ -33,7 +33,7 @@ function deploy_mysql_server () {
     kubectl apply -f ${download_location}/mysql-deployment.yaml -n vick-system
     #Wait till the mysql deployment availability
     kubectl wait deployment/wso2apim-with-analytics-mysql-deployment --for condition=available --timeout=6000s -n vick-system
-    kubectl apply -f ${dowload_location}/mysql-service.yaml -n vick-system
+    kubectl apply -f ${download_location}/mysql-service.yaml -n vick-system
 }
 
 function deploy_global_gw () {
