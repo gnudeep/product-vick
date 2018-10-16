@@ -79,6 +79,7 @@ function init_control_plane () {
 }
 
 function deploy_istio () {
+    download_location=$1
     wget https://github.com/istio/istio/releases/download/1.0.2/istio-1.0.2-linux.tar.gz
     tar -xzvf istio-1.0.2-linux.tar.gz
 
@@ -87,15 +88,16 @@ function deploy_istio () {
     kubectl apply -f $ISTIO_HOME/install/kubernetes/helm/istio/templates/crds.yaml
     #kubectl apply -f $ISTIO_HOME/install/kubernetes/istio-demo.yaml
     #kubectl apply -f $ISTIO_HOME/install/kubernetes/istio-demo-auth.yaml
-    kubectl apply -f istio-demo-vick.yaml
+    kubectl apply -f ${download_location}/istio-demo-vick.yaml
     kubectl wait deployment/istio-pilot --for condition=available --timeout=6000s -n istio-system
     #Enabling Istio injection
     kubectl label namespace default istio-injection=enabled
 }
 
 function deploy_vick_crds () {
+    download_location=$1
     #Install VICK crds
-    kubectl apply -f vick.yaml
+    kubectl apply -f ${download_location}/vick.yaml
 }
 
 function create_artifact_folder () {
@@ -177,6 +179,9 @@ crd_base_url="https://raw.githubusercontent.com/wso2/product-vick/master/build/t
 
 crd_yaml=("vick.yaml")
 
+istio_base_url="https://raw.githubusercontent.com/wso2/product-vick/master/system/scripts/kubeadm"
+istio_yaml=("istio-demo-vick.yaml")
+
 download_path="tmp-wso2"
 
 #-----------------------------------------------------------------------------------------------------------------------
@@ -190,6 +195,8 @@ echo
 download_vick_artifacts $control_plane_base_url $download_path "${control_plane_yaml[@]}"
 
 download_vick_artifacts $crd_base_url  $download_path "${crd_yaml[@]}"
+
+download_vick_artifacts $istio_base_url $download_path "${istio_yaml[@]}"
 
 #Init control plane
 echo
@@ -205,6 +212,9 @@ echo
 if [ $install_mysql == "Y" ]; then
     deploy_mysql_server $download_path
 fi
+
+#Wait for mysql server start up and schema creation
+sleep 60
 
 echo
 echo "Deploying the control plane API Manager"
