@@ -27,17 +27,17 @@ function deploy_mysql_server () {
     #Change the folder ownership to mysql server user.
     sudo chown 999:999 /mnt/mysql
 
-    kubectl create configmap mysql-dbscripts --from-file=${dowload_location}/mysql/dbscripts/ -n vick-system
-    kubectl apply -f ${dowload_location}/mysql-persistent-volumes-local.yaml -n vick-system
-    kubectl apply -f ${dowload_location}/mysql-persistent-volume-claim.yaml -n vick-system
-    kubectl apply -f ${dowload_location}/mysql-deployment.yaml -n vick-system
+    kubectl create configmap mysql-dbscripts --from-file=${download_location}/mysql/dbscripts/ -n vick-system
+    kubectl apply -f ${download_location}/mysql-persistent-volumes-local.yaml -n vick-system
+    kubectl apply -f ${download_location}/mysql-persistent-volume-claim.yaml -n vick-system
+    kubectl apply -f ${download_location}/mysql-deployment.yaml -n vick-system
     #Wait till the mysql deployment availability
     kubectl wait deployment/wso2apim-with-analytics-mysql-deployment --for condition=available --timeout=6000s -n vick-system
     kubectl apply -f ${dowload_location}/mysql-service.yaml -n vick-system
 }
 
 function deploy_global_gw () {
-
+    download_location=$1
     #Create folders required by the APIM GW PVC
     if [ -d /mnt/apim_repository_deployment_server ]; then
         sudo mv /mnt/apim_repository_deployment_server "/mnt/apim_repository_deployment_server.$(date +%s)"
@@ -47,25 +47,28 @@ function deploy_global_gw () {
     sudo chown 802:802 /mnt/apim_repository_deployment_server
 
     #Create the gw config maps
-    kubectl create configmap gw-conf --from-file=apim-configs/gw -n vick-system
-    kubectl create configmap gw-conf-datasources --from-file=apim-configs/gw/datasources/ -n vick-system
+    kubectl create configmap gw-conf --from-file=${download_location}/apim-configs/gw -n vick-system
+    kubectl create configmap gw-conf-datasources --from-file=${download_location}/apim-configs/gw/datasources/ -n vick-system
     #Create KM config maps
-    kubectl create configmap conf-identity --from-file=apim-configs/gw/identity -n vick-system
-    kubectl create configmap apim-template --from-file=apim-configs/gw/resources/api_templates -n vick-system
-    kubectl create configmap apim-tomcat --from-file=apim-configs/gw/tomcat -n vick-system
-    kubectl create configmap apim-security --from-file=apim-configs/gw/security -n vick-system
+    kubectl create configmap conf-identity --from-file=${download_location}/apim-configs/gw/identity -n vick-system
+    kubectl create configmap apim-template --from-file=${download_location}/apim-configs/gw/resources/api_templates -n vick-system
+    kubectl create configmap apim-tomcat --from-file=${download_location}/apim-configs/gw/tomcat -n vick-system
+    kubectl create configmap apim-security --from-file=${download_location}/apim-configs/gw/security -n vick-system
     #Create apim local volumes and volume claims
-    kubectl apply -f vick-apim-persistent-volumes-local.yaml -n vick-system
-    kubectl apply -f vick-apim-persistent-volume-claim-local.yaml -n vick-system
+    kubectl apply -f ${download_location}/vick-apim-persistent-volumes-local.yaml -n vick-system
+    kubectl apply -f ${download_location}/vick-apim-persistent-volume-claim-local.yaml -n vick-system
     #Create gateway deployment and the service
-    kubectl apply -f vick-apim-gw.yaml -n vick-system
+    kubectl apply -f ${download_location}/vick-apim-gw.yaml -n vick-system
+     #Wait till the gateway deployment availability
+    kubectl wait deployment/gateway --for condition=available --timeout=6000s -n vick-system
     #Create gateway ingress
-    kubectl apply -f vick-apim-gw-ingress.yaml -n vick-system
+    kubectl apply -f ${download_location}/vick-apim-gw-ingress.yaml -n vick-system
 }
 
 function init_control_plane () {
+    download_location=$1
     #Setup VICK namespace, create service account and the docker registry credentials
-    kubectl apply -f vick-ns-init.yaml
+    kubectl apply -f ${dowload_location}/vick-ns-init.yaml
 
     HOST_NAME=$(hostname | tr '[:upper:]' '[:lower:]')
     #label the node
@@ -98,10 +101,10 @@ function deploy_vick_crds () {
 function create_artifact_folder () {
  tmp_folder=$1
  if [ -d $tmp_folder ]; then
-        mv $tmp_folder "$tmp_foler.$(date +%s)"
+        mv $tmp_folder ${tmp_folder}.$(date +%s)
     fi
 
-    mkdir $tmp_folder
+    mkdir ${tmp_folder}
 }
 function download_vick_artifacts () {
 
@@ -193,30 +196,30 @@ echo
 echo "Creating vick-system namespace and the service account"
 echo
 
-init_control_plane
+init_control_plane $download_path
 
 echo
-read -p "Do you want to deploy MySQL server in to vick-system namespace [Y/n]: " deploy_mysql_server
+read -p "Do you want to deploy MySQL server in to vick-system namespace [Y/n]: " install_mysql
 echo
 
-if [ $deploy_mysql_server == "Y" ]; then
-    install_mysql_server
+if [ $install_mysql == "Y" ]; then
+    deploy_mysql_server $download_path
 fi
 
 echo
 echo "Deploying the control plane API Manager"
 echo
 
-deploy_global_gw
+deploy_global_gw $download_path
 
 echo
 echo "Deploying Istio"
 echo
 
-deploy_istio
+deploy_istio $download_path
 
 echo
 echo "Deploy vick crds"
 echo
 
-deploy_vick_crds
+deploy_vick_crds $download_path
