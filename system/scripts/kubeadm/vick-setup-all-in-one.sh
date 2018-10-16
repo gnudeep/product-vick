@@ -18,7 +18,7 @@
 # ------------------------------------------------------------------------
 
 function deploy_mysql_server () {
-
+    download_location=$1
     #Create folders required by the mysql PVC
     if [ -d /mnt/mysql ]; then
         sudo mv /mnt/mysql "/mnt/mysql.$(date +%s)"
@@ -27,13 +27,13 @@ function deploy_mysql_server () {
     #Change the folder ownership to mysql server user.
     sudo chown 999:999 /mnt/mysql
 
-    kubectl create configmap mysql-dbscripts --from-file=mysql/dbscripts/ -n vick-system
-    kubectl apply -f mysql-persistent-volumes-local.yaml -n vick-system
-    kubectl apply -f mysql-persistent-volume-claim.yaml -n vick-system
-    kubectl apply -f mysql-deployment.yaml -n vick-system
+    kubectl create configmap mysql-dbscripts --from-file=${dowload_location}/mysql/dbscripts/ -n vick-system
+    kubectl apply -f ${dowload_location}/mysql-persistent-volumes-local.yaml -n vick-system
+    kubectl apply -f ${dowload_location}/mysql-persistent-volume-claim.yaml -n vick-system
+    kubectl apply -f ${dowload_location}/mysql-deployment.yaml -n vick-system
     #Wait till the mysql deployment availability
     kubectl wait deployment/wso2apim-with-analytics-mysql-deployment --for condition=available --timeout=6000s -n vick-system
-    kubectl apply -f mysql-service.yaml -n vick-system
+    kubectl apply -f ${dowload_location}/mysql-service.yaml -n vick-system
 }
 
 function deploy_global_gw () {
@@ -96,16 +96,17 @@ function deploy_vick_crds () {
 }
 
 function create_artifact_folder () {
-
- if [ -d tmp-vick ]; then
-        mv tmp-vick "tmp-vick.$(date +%s)"
+ tmp_folder=$1
+ if [ -d $tmp_folder ]; then
+        mv $tmp_folder "$tmp_foler.$(date +%s)"
     fi
 
-    mkdir tmp-vick
+    mkdir $tmp_folder
 }
 function download_vick_artifacts () {
 
     base_url=$1
+    download_path=$2
     yaml_list=("$@")
 
     for file_path in "${yaml_list[@]}"
@@ -114,17 +115,13 @@ function download_vick_artifacts () {
       if [[ $file_path =~ / ]]; then
         dir_name=${file_path%/*}
       fi
-      wget "$base_url/$file_path" -P "tmp-vick/$dir_name" -a vick-setup.log
+      wget "$base_url/$file_path" -P "$download_path/$dir_name" -a vick-setup.log
     done
 }
 
 #-----------------------------------------------------------------------------------------------------------------------
 
 control_plane_base_url="https://raw.githubusercontent.com/wso2/product-vick/master/system/control-plane/global"
-
-#    "https://raw.githubusercontent.com/wso2/product-vick/master/system/control-plane/global"
-#    "https://raw.githubusercontent.com/wso2/product-vick/master/build/target"
-
 
 control_plane_yaml=(
     "mysql-deployment.yaml"
@@ -174,19 +171,22 @@ control_plane_yaml=(
 )
 
 crd_base_url="https://raw.githubusercontent.com/wso2/product-vick/master/build/target"
+
 crd_yaml=("vick.yaml")
+
+download_path="tmp-wso2"
 
 #-----------------------------------------------------------------------------------------------------------------------
 #Create temporary foldr to download vick artifacts
-create_artifact_folder
+create_artifact_folder $download_path
 
 echo
 echo "Downloading vick artifacts"
 echo
 
-download_vick_artifacts $control_plane_base_url "${control_plane_yaml[@]}"
+download_vick_artifacts $control_plane_base_url $download_path "${control_plane_yaml[@]}"
 
-download_vick_artifacts $crd_base_url "${crd_yaml[@]}"
+download_vick_artifacts $crd_base_url  $download_path "${crd_yaml[@]}"
 
 #Init control plane
 echo
