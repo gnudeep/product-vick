@@ -68,7 +68,7 @@ function deploy_global_gw () {
 function init_control_plane () {
     download_location=$1
     #Setup VICK namespace, create service account and the docker registry credentials
-    kubectl apply -f ${dowload_location}/vick-ns-init.yaml
+    kubectl apply -f ${download_location}/vick-ns-init.yaml
 
     HOST_NAME=$(hostname | tr '[:upper:]' '[:lower:]')
     #label the node
