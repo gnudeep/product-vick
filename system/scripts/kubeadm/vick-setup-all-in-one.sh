@@ -68,20 +68,20 @@ function deploy_global_gw () {
 function deploy_sp_dashboard_worker () {
     download_location=$1
     #Create SP worker configmaps
-    kubectl create configmap sp-worker-siddhi --from-file==${download_location}/sp-worker/siddhi -n vick-system
-    kubectl create configmap sp-worker-conf --from-file==${download_location}/sp-worker/conf -n vick-system
-    kubectl create configmap sp-worker-bin --from-file==${download_location}/sp-worker/bin -n vick-system
+    kubectl create configmap sp-worker-siddhi --from-file=${download_location}/sp-worker/siddhi -n vick-system
+    kubectl create configmap sp-worker-conf --from-file=${download_location}/sp-worker/conf -n vick-system
+    kubectl create configmap sp-worker-bin --from-file=${download_location}/sp-worker/bin -n vick-system
     #Create SP worker deployment
-    kubectl apply -f vick-sp-worker-deployment.yaml -n vick-system
-    kubectl apply -f vick-sp-worker-service.yaml -n vick-system
+    kubectl apply -f ${download_location}/vick-sp-worker-deployment.yaml -n vick-system
+    kubectl apply -f ${download_location}/vick-sp-worker-service.yaml -n vick-system
     #Create SP dashboard configmaps
-    kubectl create configmap sp-dashboard-conf --from-file==${download_location}/status-dashboard/conf -n vick-system
+    kubectl create configmap sp-dashboard-conf --from-file=${download_location}/status-dashboard/conf -n vick-system
     #kubectl create configmap sp-worker-bin --from-file=sp-worker/bin -n vick-system
     #Create SP status dashboard deployment
-    kubectl apply -f vick-sp-dashboard-deployment.yaml -n vick-system
-    kubectl apply -f vick-sp-dashboard-service.yaml -n vick-system
+    kubectl apply -f ${download_location}/vick-sp-dashboard-deployment.yaml -n vick-system
+    kubectl apply -f ${download_location}/vick-sp-dashboard-service.yaml -n vick-system
     #Create SP dashboard ingress
-    kubectl apply -f vick-sp-dashboard-ingress.yaml -n vick-system
+    kubectl apply -f ${download_location}/vick-sp-dashboard-ingress.yaml -n vick-system
 }
 function init_control_plane () {
     download_location=$1
