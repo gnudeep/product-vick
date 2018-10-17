@@ -47,7 +47,7 @@ function install_k8s () {
     sudo add-apt-repository "deb [arch=amd64] http://apt.kubernetes.io/ kubernetes-xenial main"
     #Install K8s components
     sudo apt-get install -y kubelet=$K8S_VERSION kubeadm=$K8S_VERSION kubectl=$K8S_VERSION
-    sudo apt-mark hold kubelet kubeadm kubect
+    sudo apt-mark hold kubelet kubeadm kubectl
 }
 
 function configure_k8s () {
@@ -315,7 +315,7 @@ echo "Creating vick-system namespace and the service account"
 
 init_control_plane $download_path
 
-read -p "Do you want to deploy MySQL server in to vick-system namespace [Y/n]: " install_mysql
+read -p "Do you want to deploy MySQL server in to vick-system namespace [Y/n]: " install_mysql < /dev/tty
 
 if [ $install_mysql == "Y" ]; then
     deploy_mysql_server $download_path
