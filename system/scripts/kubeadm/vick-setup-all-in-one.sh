@@ -17,6 +17,90 @@
 #
 # ------------------------------------------------------------------------
 
+function install_k8s () {
+
+    UBUNTU_VERSION=$(cat /etc/lsb-release | sed -n 'DISTRIB_RELEASE/p' | awk -F'=' '{print $2}')
+    #if you get an error similar to
+    #'[ERROR Swap]: running with swap on is not supported. Please disable swap', disable swap:
+    sudo swapoff -a
+    # install some utils
+    sudo apt-get install -y apt-transport-https ca-certificates curl software-properties-common
+    #Install Docker
+    curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -
+    if [ $UBUNTU_VERSION == "16.04" ]; then
+        sudo add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu xenial stable"
+    elif [ $UBUNTU_VERSION == "18.04" ]; then
+        sudo add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu bionic stable"
+    else
+        #default tested version
+        sudo add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu xenial stable"
+    fi
+    sudo apt-get update
+    sudo apt-get install -y docker.io
+    #Install NFS client
+    sudo apt-get install -y nfs-common
+    #Enable docker service
+    sudo systemctl enable docker.service
+    #Update the apt source list
+    curl -s https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo apt-key add -
+    sudo add-apt-repository "deb [arch=amd64] http://apt.kubernetes.io/ kubernetes-xenial main"
+    #Install K8s components
+    sudo apt-get install -y kubelet=$K8S_VERSION kubeadm=$K8S_VERSION kubectl=$K8S_VERSION
+    sudo apt-mark hold kubelet kubeadm kubect
+}
+
+function configure_k8s () {
+$node_type=$1
+if [ -z $node_type ]; then
+    $node_type="master"
+fi
+
+if [ $node_type == "master" ]; then
+    #Initialize the k8s cluster
+    sudo kubeadm init --pod-network-cidr=10.244.0.0/16
+
+    sleep 60
+
+    #Create .kube file if it does not exists
+    mkdir -p $HOME/.kube
+    #Move Kubernetes config file if it exists
+    if [ -f $HOME/.kube/config ]; then
+        mv $HOME/.kube/config $HOME/.kube/config.back
+    fi
+
+    sudo cp -f /etc/kubernetes/admin.conf $HOME/.kube/config
+    sudo chown $(id -u):$(id -g) $HOME/.kube/config
+
+    #if you are using a single node which acts as both a master and a worker
+    #untaint the node so that pods will get scheduled:
+    kubectl taint nodes --all node-role.kubernetes.io/master-
+
+    #Install Flannel network
+    kubectl apply -f https://raw.githubusercontent.com/coreos/flannel/v0.10.0/Documentation/kube-flannel.yml
+
+    #Install admission plugins
+    echo "Installing K8s admission plugins"
+    sudo sed -i 's/--enable-admission-plugins=NodeRestriction/--enable-admission-plugins=NamespaceLifecycle,LimitRanger,ServiceAccount,DefaultStorageClass,DefaultTolerationSeconds,NodeRestriction,MutatingAdmissionWebhook,ValidatingAdmissionWebhook,ResourceQuota/' /etc/kubernetes/manifests/kube-apiserver.yaml
+
+    #Wait to restart the K8s with new admission plugins
+    sleep 60
+ echo "K8s Master node installation is finished"
+
+elif [ $node_type == "worker" ]; then
+    read -p "Enter the Master node IP and the Token [master_node_ip token discovery_token_ca_cert_hash]:" master_node_ip token discovery_token_ca_cert_hash
+    if [ -n "$master_node_ip" ] && [ -n "$token" ] && [ -n "$discovery_token_ca_cert_hash" ]; then
+        echo $master_node_ip $token $discovery_token_ca_cert_hash
+        #Add more worker nodes.
+        sudo kubeadm join $master_node_ip:6443 --token $token --discovery-token-ca-cert-hash $discovery_token_ca_cert_hash
+    else
+        echo " Enter all three argument"
+    fi
+else
+    echo "Enter correct arguments"
+fi
+
+}
+
 function deploy_mysql_server () {
     download_location=$1
     #Create folders required by the mysql PVC
@@ -144,7 +228,8 @@ function download_vick_artifacts () {
 
 #-----------------------------------------------------------------------------------------------------------------------
 
-control_plane_base_url="https://raw.githubusercontent.com/wso2/product-vick/master/system/control-plane/global"
+git_base_url="https://raw.githubusercontent.com/gnudeep/product-vick/installation-scripts"
+control_plane_base_url="${git_base_url}/system/control-plane/global"
 
 control_plane_yaml=(
     "mysql-deployment.yaml"
@@ -197,11 +282,11 @@ control_plane_yaml=(
     "mysql/dbscripts/init.sql"
 )
 
-crd_base_url="https://raw.githubusercontent.com/wso2/product-vick/master/build/target"
+crd_base_url="${git_base_url}/build/target"
 
 crd_yaml=("vick.yaml")
 
-istio_base_url="https://raw.githubusercontent.com/wso2/product-vick/master/system/scripts/kubeadm"
+istio_base_url="${git_base_url}/system/scripts/kubeadm"
 istio_yaml=("istio-demo-vick.yaml")
 
 download_path="tmp-wso2"
@@ -217,6 +302,12 @@ download_vick_artifacts $control_plane_base_url $download_path "${control_plane_
 download_vick_artifacts $crd_base_url  $download_path "${crd_yaml[@]}"
 
 download_vick_artifacts $istio_base_url $download_path "${istio_yaml[@]}"
+
+#Install K8s
+install_k8s
+
+#configure master node
+configure_k8s
 
 #Init control plane
 echo "Creating vick-system namespace and the service account"
