@@ -18,8 +18,9 @@
 # ------------------------------------------------------------------------
 
 function install_k8s () {
-
+    K8S_VERSION=$1
     UBUNTU_VERSION=$(cat /etc/lsb-release | sed -n 'DISTRIB_RELEASE/p' | awk -F'=' '{print $2}')
+
     #if you get an error similar to
     #'[ERROR Swap]: running with swap on is not supported. Please disable swap', disable swap:
     sudo swapoff -a
@@ -50,7 +51,7 @@ function install_k8s () {
 }
 
 function configure_k8s () {
-$node_type=$1
+node_type=$1
 if [ -z $node_type ]; then
     $node_type="master"
 fi
@@ -304,7 +305,7 @@ download_vick_artifacts $crd_base_url  $download_path "${crd_yaml[@]}"
 download_vick_artifacts $istio_base_url $download_path "${istio_yaml[@]}"
 
 #Install K8s
-install_k8s
+install_k8s "1.11.3-00"
 
 #configure master node
 configure_k8s
