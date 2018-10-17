@@ -53,7 +53,7 @@ function install_k8s () {
 function configure_k8s () {
 node_type=$1
 if [ -z $node_type ]; then
-    $node_type="master"
+    node_type="master"
 fi
 
 if [ $node_type == "master" ]; then
