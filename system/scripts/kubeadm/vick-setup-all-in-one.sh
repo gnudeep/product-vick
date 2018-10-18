@@ -183,10 +183,10 @@ function init_control_plane () {
 
 function deploy_istio () {
     download_location=$1
-    wget https://github.com/istio/istio/releases/download/1.0.2/istio-1.0.2-linux.tar.gz
-    tar -xzvf istio-1.0.2-linux.tar.gz
-
-    ISTIO_HOME=istio-1.0.2
+    istio_version=$2
+    ISTIO_HOME=${download_location}/istio-${istio_version}
+    wget https://github.com/istio/istio/releases/download/${istio_version}/istio-${istio_version}-linux.tar.gz -P ${download_location}
+    tar -xzvf ${download_location}/istio-${istio_version}-linux.tar.gz -C ${download_location}
     export PATH=$ISTIO_HOME/bin:$PATH
     kubectl apply -f $ISTIO_HOME/install/kubernetes/helm/istio/templates/crds.yaml
     #kubectl apply -f $ISTIO_HOME/install/kubernetes/istio-demo.yaml
@@ -229,9 +229,12 @@ function download_vick_artifacts () {
 
 #-----------------------------------------------------------------------------------------------------------------------
 
+k8s_version="1.11.3-00"
+istio_version="1.0.2"
+download_path="tmp-wso2"
 git_base_url="https://raw.githubusercontent.com/gnudeep/product-vick/installation-scripts"
-control_plane_base_url="${git_base_url}/system/control-plane/global"
 
+control_plane_base_url="${git_base_url}/system/control-plane/global"
 control_plane_yaml=(
     "mysql-deployment.yaml"
     "mysql-persistent-volume-claim.yaml"
@@ -284,13 +287,10 @@ control_plane_yaml=(
 )
 
 crd_base_url="${git_base_url}/build/target"
-
 crd_yaml=("vick.yaml")
 
 istio_base_url="${git_base_url}/system/scripts/kubeadm"
 istio_yaml=("istio-demo-vick.yaml")
-
-download_path="tmp-wso2"
 
 #-----------------------------------------------------------------------------------------------------------------------
 #Create temporary foldr to download vick artifacts
@@ -305,7 +305,7 @@ download_vick_artifacts $crd_base_url  $download_path "${crd_yaml[@]}"
 download_vick_artifacts $istio_base_url $download_path "${istio_yaml[@]}"
 
 #Install K8s
-install_k8s "1.11.3-00"
+install_k8s $k8s_version
 
 #configure master node
 configure_k8s
@@ -331,7 +331,7 @@ deploy_sp_dashboard_worker $download_path
 
 echo "Deploying Istio"
 
-deploy_istio $download_path
+deploy_istio $download_path $istio_version
 
 echo "Deploy vick crds"
 
