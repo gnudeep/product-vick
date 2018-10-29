@@ -93,7 +93,7 @@ spec:
       volumes:
       - name: apim-storage-volume
         persistentVolumeClaim:
-          claimName: wso2apim-local-pvc
+          claimName: apim-repository-deployment-server-pvc
       - name: apim-conf
         configMap:
           name: gw-conf
