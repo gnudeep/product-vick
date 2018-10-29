@@ -229,11 +229,15 @@ function read_control_plane_datasources_configs () {
     fi
 }
 
+#Update pub-store/gw/sp worker/ sp dashboard datasources
 function update_control_plane_datasources () {
     local download_location=$1
     for param in "${!config_params[@]}"
     do
         sed -i '' "s/$param/${config_params[$param]}/g" ${download_location}/apim-configs/pub-store/datasources/master-datasources.xml
+        sed -i '' "s/$param/${config_params[$param]}/g" ${download_location}/apim-configs/gw/datasources/master-datasources.xml
+        sed -i '' "s/$param/${config_params[$param]}/g" ${download_location}/sp-worker/conf/deployment.yaml
+        sed -i '' "s/$param/${config_params[$param]}/g" ${download_location}/sp-dashboard/conf/deployment.yaml
     done
 }
 
@@ -254,8 +258,9 @@ function deploy_global_gw () {
         kubectl apply -f ${download_location}/vick-apim-persistent-volumes-local.yaml -n vick-system
         kubectl apply -f ${download_location}/vick-apim-persistent-volume-claim-local.yaml -n vick-system
     elif [ $iaas == "GCP" ]; then
-        #mount nfs share
-        echo "mount NFS share"
+        #Create apim NFS volumes and volume claims
+        kubectl apply -f ${download_location}/vick-apim-artifacts-persistent-volumes.yaml -n vick-system
+        kubectl apply -f ${download_location}/vick-apim-artifacts-persistent-volume-claim.yaml -n vick-system
     fi
 
     #Create the gw config maps
@@ -438,7 +443,7 @@ download_vick_artifacts $istio_base_url $download_path "${istio_yaml[@]}"
 #Install K8s
 if [ $iaas == "GCP" ]; then
     echo "GCP selected"
-    #install_k8s_gcp $gcp_project
+    install_k8s_gcp $gcp_project
 elif [ $iaas == "kubeadm" ]; then
     install_k8s_kubeadm $k8s_version
     #configure master node
