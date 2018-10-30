@@ -210,10 +210,10 @@ function read_control_plane_datasources_configs () {
 
     echo "Configuring remote MySQL server"
     echo
-    read -p "Database name: " db_name < /dev/tty
-    if [[ ! -z "${db_name/ //}" ]]; then
+    read -p "Database host name: " db_name < /dev/tty
+    if [[ ! -z "${db_hostname/ //}" ]]; then
     echo $db_name
-            config_params["MYSQL_DATABASE_HOST"]=$db_name
+            config_params["MYSQL_DATABASE_HOST"]=$db_hostname
     fi
     echo
     read -p "Database user name: " db_user < /dev/tty
@@ -362,6 +362,9 @@ function download_vick_artifacts () {
 iaas=$1
 gcp_project=$2
 
+#sanity check
+#Bash 4 / gcloud tools if GCP
+
 k8s_version="1.11.3-00"
 istio_version="1.0.2"
 download_path="tmp-wso2"
@@ -394,6 +397,7 @@ control_plane_yaml=(
     "vick-sp-worker-deployment.yaml"
     "vick-sp-worker-service.yaml"
     "vick-apim-artifacts-persistent-volumes.yaml"
+    "vick-apim-artifacts-persistent-volume-claim.yaml"
     "apim-configs/gw/datasources/master-datasources.xml"
     "apim-configs/gw/user-mgt.xml"
     "apim-configs/gw/identity/identity.xml"
@@ -443,7 +447,7 @@ download_vick_artifacts $istio_base_url $download_path "${istio_yaml[@]}"
 #Install K8s
 if [ $iaas == "GCP" ]; then
     echo "GCP selected"
-    install_k8s_gcp $gcp_project
+    #install_k8s_gcp $gcp_project
 elif [ $iaas == "kubeadm" ]; then
     install_k8s_kubeadm $k8s_version
     #configure master node
