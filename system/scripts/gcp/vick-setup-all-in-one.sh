@@ -120,11 +120,11 @@ echo "Read NFS connection"
     echo
     read -p "NFS server IP: " nfs_server_ip < /dev/tty
     if [[ ! -z "${nfs_server_ip/ //}" ]]; then
-        config_params["NFS_SERVER_IP"]=$nfs_server_ip
+        nfs_config_params["NFS_SERVER_IP"]=$nfs_server_ip
     fi
     read -p "NFS share location: " nfs_share_location < /dev/tty
     if [[ ! -z "${nfs_share_location/ //}" ]]; then
-        config_params["NFS_SHARE_LOCATION"]=$nfs_share_location
+        nfs_config_params["NFS_SHARE_LOCATION"]=$nfs_share_location
     fi
     echo
 }
