@@ -134,7 +134,7 @@ function update_apim_nfs_volumes () {
  local download_location=$1
     for param in "${!nfs_config_params[@]}"
     do
-        sed -i '' "s/$param/${nfs_config_params[$param]}/g" ${download_location}/vick-apim-artifacts-persistent-volumes.yaml
+        sed -i '' "s|$param|${nfs_config_params[$param]}|g" ${download_location}/vick-apim-artifacts-persistent-volumes.yaml
     done
 }
 
@@ -210,7 +210,7 @@ function read_control_plane_datasources_configs () {
 
     echo "Configuring remote MySQL server"
     echo
-    read -p "Database host name: " db_name < /dev/tty
+    read -p "Database host name: " db_hostname < /dev/tty
     if [[ ! -z "${db_hostname/ //}" ]]; then
     echo $db_name
             config_params["MYSQL_DATABASE_HOST"]=$db_hostname
