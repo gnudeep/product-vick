@@ -70,9 +70,6 @@ spec:
         -
           containerPort: 7611
           protocol: "TCP"
-        securityContext:
-          runAsUser: 802
-          fsGroup: 802
         volumeMounts:
         - name: apim-storage-volume
           mountPath: /home/wso2carbon/wso2am-2.6.0/repository/deployment/server

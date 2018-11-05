@@ -106,8 +106,29 @@ fi
 
 #Create new NFS share
 function create_nfs_share_gcp () {
-echo "Create NFS share"
+echo "Creating NFS share"
+local nfs_share_location=$1
+local nfs_server_ip
 
+gcloud beta filestore instances create nfs-server \
+    --project=knative-deep \
+    --location=us-west1-c \
+    --tier=STANDARD \
+    --file-share=name="${nfs_share_location}",capacity=1TB \
+    --network=name="default"
+
+sleep 30
+
+nfs_server_ip=$(gcloud beta filestore instances describe nfs-server --project=knative-deep --location=us-west1-c \
+--format flattened | awk '/ipAddresses/  {print $2}')
+
+if [ -n $nfs_server_ip ]; then
+    nfs_config_params["NFS_SERVER_IP"]=$nfs_server_ip
+    nfs_config_params["NFS_SHARE_LOCATION"]="/${nfs_share_location}"
+else
+    echo "Error in NFS share creation"
+    exit 0
+fi
 }
 
 #Read NFS connection details form the user
@@ -200,6 +221,22 @@ function deploy_mysql_server () {
     #Wait till the mysql deployment availability
     kubectl wait deployment/wso2apim-with-analytics-mysql-deployment --for condition=available --timeout=6000s -n vick-system
     kubectl apply -f ${download_location}/mysql-service.yaml -n vick-system
+}
+
+function deploy_mysql_server_gcp () {
+
+    gcloud sql instances create vick-sql-2 --tier=db-n1-standard-1 --gce-zone=us-west1-c
+
+    gcloud beta sql instances describe vick-sql-1
+
+    gsutil mb --retention 3600s -l us-west1 gs://vickdb
+
+    gsutil cp /Users/deep/wso2/VICK/repos/product-vick-01/system/control-plane/global/mysql/dbscripts/init.sql gs://vickdb/init.sql
+
+    gsutil acl ch -u ffnwevogonffbomfrwopfqe4hi@speckle-umbrella-36.iam.gserviceaccount.com:R gs://vickdb/init.sql
+
+     gcloud sql import sql vick-sql-1 gs://vickdb/init.sql
+
 }
 
 #Configure remote mysql server endpoint in control plane configuration files.
@@ -465,21 +502,25 @@ init_control_plane $download_path
 read -p "Do you want to deploy NFS server [Y/n]: " install_nfs < /dev/tty
 
 if [ $install_nfs == "Y" ] && [ $iaas == "GCP" ]; then
-    create_nfs_share_gcp
-    #get nfs share IP
+    create_nfs_share_gcp "data"
 else
     read_nfs_connection
-    update_apim_nfs_volumes $download_path
 fi
+update_apim_nfs_volumes $download_path
+
 #Deploy/configure MySQL / APIM datasources
 read -p "Do you want to deploy MySQL server in to vick-system namespace [Y/n]: " install_mysql < /dev/tty
 
-if [ $install_mysql == "Y" ]; then
+if [ $install_mysql == "Y" ] && [ $iaas == "GCP" ]; then
+    deploy_mysql_server_gcp
+    #create databaees
+elif [ $install_mysql == "Y" ] && [ $iaas == "kubeadm" ]; then
     deploy_mysql_server $download_path
 else
     read_control_plane_datasources_configs
-    update_control_plane_datasources $download_path
+
 fi
+update_control_plane_datasources $download_path
 
 echo "Deploying the control plane API Manager"
 
