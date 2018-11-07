@@ -181,7 +181,7 @@ CLUSTER_ZONE=us-west1-c
 echo "Creating K8s cluster $CLUSTER_NAM in in zone $CLUSTER_ZONE"
 
 #Create K8s cluster
-gcloud container clusters create $CLUSTER_NAME \
+gcloud -q container clusters create $CLUSTER_NAME \
   --zone=$CLUSTER_ZONE \
   --cluster-version=latest \
   --machine-type=n1-standard-4 \
@@ -224,18 +224,33 @@ function deploy_mysql_server () {
 }
 
 function deploy_mysql_server_gcp () {
+    local download_location=$1
+    local sql_instance_name=$2
+    local service_account
+    local mysql_server_ip
+    gcloud -q sql instances create ${sql_instance_name} --tier=db-n1-standard-1 --gce-zone=us-west1-c
+    service_account=$(gcloud beta sql instances describe ${sql_instance_name} --format flattened | awk '/serviceAccountEmailAddress/ {print $2}')
+    #if service account is zero exit
+    gsutil -q mb --retention 3600s -l us-west1 gs://vickdb
+    gsutil cp ${download_location}/mysql/dbscripts/init.sql gs://vickdb/init.sql
+    gsutil acl ch -u ${service_account}:R gs://vickdb/init.sql
+    gcloud -q sql import sql ${sql_instance_name} gs://vickdb/init.sql
+    gcloud -q sql instances patch ${sql_instance_name} --authorized-networks=0.0.0.0/0
 
-    gcloud sql instances create vick-sql-2 --tier=db-n1-standard-1 --gce-zone=us-west1-c
+    mysql_server_ip=$(gcloud beta sql instances describe ${sql_instance_name} --format flattened | awk '/.ipAddress/ {print $2}')
+    config_params["MYSQL_DATABASE_HOST"]=$mysql_server_ip
 
-    gcloud beta sql instances describe vick-sql-1
-
-    gsutil mb --retention 3600s -l us-west1 gs://vickdb
-
-    gsutil cp /Users/deep/wso2/VICK/repos/product-vick-01/system/control-plane/global/mysql/dbscripts/init.sql gs://vickdb/init.sql
-
-    gsutil acl ch -u ffnwevogonffbomfrwopfqe4hi@speckle-umbrella-36.iam.gserviceaccount.com:R gs://vickdb/init.sql
-
-     gcloud sql import sql vick-sql-1 gs://vickdb/init.sql
+    read -p "Database user name: " db_user < /dev/tty
+    if [[ ! -z "${db_user/ //}" ]]; then
+    echo $db_name
+            config_params["DATABASE_USERNAME"]=$db_user
+    fi
+    echo
+    read -p "Database user password: " db_passwd < /dev/tty
+    if [[ ! -z "${db_passwd/ //}" ]]; then
+    echo $db_name
+            config_params["DATABASE_PASSWORD"]=$db_passwd
+    fi
 
 }
 
@@ -484,7 +499,7 @@ download_vick_artifacts $istio_base_url $download_path "${istio_yaml[@]}"
 #Install K8s
 if [ $iaas == "GCP" ]; then
     echo "GCP selected"
-    #install_k8s_gcp $gcp_project
+    install_k8s_gcp $gcp_project
 elif [ $iaas == "kubeadm" ]; then
     install_k8s_kubeadm $k8s_version
     #configure master node
@@ -512,13 +527,11 @@ update_apim_nfs_volumes $download_path
 read -p "Do you want to deploy MySQL server in to vick-system namespace [Y/n]: " install_mysql < /dev/tty
 
 if [ $install_mysql == "Y" ] && [ $iaas == "GCP" ]; then
-    deploy_mysql_server_gcp
-    #create databaees
+    deploy_mysql_server_gcp $download_path "vick-mysql-9"
 elif [ $install_mysql == "Y" ] && [ $iaas == "kubeadm" ]; then
     deploy_mysql_server $download_path
 else
     read_control_plane_datasources_configs
-
 fi
 update_control_plane_datasources $download_path
 
