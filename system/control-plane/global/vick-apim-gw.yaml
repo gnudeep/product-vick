@@ -42,13 +42,6 @@ spec:
           initialDelaySeconds: 150
           periodSeconds: 10
         imagePullPolicy: Always
-        env:
-        - name: ZIPKIN_HOST
-          value: "wso2sp-worker.vick-system"
-        - name: ZIPKIN_PORT
-          value: "9411"
-        - name: ZIPKIN_API_CONTEXT
-          value: "/api/v1/spans"
         ports:
         -
           containerPort: 8280
@@ -94,13 +87,21 @@ spec:
           mountPath: /home/wso2carbon/wso2-config-volume/repository/conf/security
 #        - name: auth-ext
 #          mountPath: /home/wso2carbon/wso2-artifact-volume/repository/components/lib
+      # These containers are run during pod initialization
+      initContainers:
+      - name: install
+        image: busybox
+        command: ["chown", "-R", "802:802", "/home/wso2carbon/wso2am-2.6.0/repository/deployment/server"]
+        volumeMounts:
+        - name: apim-storage-volume
+          mountPath: "/home/wso2carbon/wso2am-2.6.0/repository/deployment/server"
       serviceAccountName: "vicksvc-account"
       imagePullSecrets:
       - name: wso2creds
       volumes:
       - name: apim-storage-volume
         persistentVolumeClaim:
-          claimName: wso2apim-local-pvc
+          claimName: apim-repository-deployment-server-pvc
       - name: apim-conf
         configMap:
           name: gw-conf
