@@ -239,19 +239,6 @@ function deploy_mysql_server_gcp () {
 
     mysql_server_ip=$(gcloud beta sql instances describe ${sql_instance_name} --format flattened | awk '/.ipAddress/ {print $2}')
     config_params["MYSQL_DATABASE_HOST"]=$mysql_server_ip
-
-    read -p "Database user name: " db_user < /dev/tty
-    if [[ ! -z "${db_user/ //}" ]]; then
-    echo $db_name
-            config_params["DATABASE_USERNAME"]=$db_user
-    fi
-    echo
-    read -p "Database user password: " db_passwd < /dev/tty
-    if [[ ! -z "${db_passwd/ //}" ]]; then
-    echo $db_name
-            config_params["DATABASE_PASSWORD"]=$db_passwd
-    fi
-
 }
 
 #Configure remote mysql server endpoint in control plane configuration files.
@@ -260,25 +247,30 @@ function read_control_plane_datasources_configs () {
     local db_passwd
     local db_name
 
+    if [ $iaas == "kubeadm" ]; then
     echo "Configuring remote MySQL server"
-    echo
     read -p "Database host name: " db_hostname < /dev/tty
-    if [[ ! -z "${db_hostname/ //}" ]]; then
-    echo $db_name
-            config_params["MYSQL_DATABASE_HOST"]=$db_hostname
+        if [[ ! -z "${db_hostname/ //}" ]]; then
+                config_params["MYSQL_DATABASE_HOST"]=$db_hostname
+        fi
     fi
-    echo
     read -p "Database user name: " db_user < /dev/tty
     if [[ ! -z "${db_user/ //}" ]]; then
-    echo $db_name
             config_params["DATABASE_USERNAME"]=$db_user
     fi
-    echo
     read -p "Database user password: " db_passwd < /dev/tty
     if [[ ! -z "${db_passwd/ //}" ]]; then
-    echo $db_name
             config_params["DATABASE_PASSWORD"]=$db_passwd
     fi
+}
+
+function update_control_plance_sql () {
+local download_location=$1
+    for param in "${!config_params[@]}"
+    do
+        sed -i '' "s/$param/${config_params[$param]}/g" ${download_location}/mysql/dbscripts/init.sql
+    done
+
 }
 
 #Update pub-store/gw/sp worker/ sp dashboard datasources
@@ -527,8 +519,13 @@ update_apim_nfs_volumes $download_path
 read -p "Do you want to deploy MySQL server in to vick-system namespace [Y/n]: " install_mysql < /dev/tty
 
 if [ $install_mysql == "Y" ] && [ $iaas == "GCP" ]; then
+    #Read db user / passwd
+    read_control_plane_datasources_configs
+    #Update the sql
     deploy_mysql_server_gcp $download_path "vick-mysql-9"
 elif [ $install_mysql == "Y" ] && [ $iaas == "kubeadm" ]; then
+    read_control_plane_datasources_configs
+    #update the sql file
     deploy_mysql_server $download_path
 else
     read_control_plane_datasources_configs
