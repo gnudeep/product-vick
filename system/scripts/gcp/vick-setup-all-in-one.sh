@@ -205,7 +205,7 @@ kubectl create clusterrolebinding cluster-admin-binding \
 }
 
 function deploy_mysql_server () {
-    download_location=$1
+    local download_location=$1
     #Create folders required by the mysql PVC
     if [ -d /mnt/mysql ]; then
         sudo mv /mnt/mysql "/mnt/mysql.$(date +%s)"
@@ -326,7 +326,7 @@ function deploy_global_gw () {
 }
 
 function deploy_sp_dashboard_worker () {
-    download_location=$1
+    local download_location=$1
     #Create SP worker configmaps
     kubectl create configmap sp-worker-siddhi --from-file=${download_location}/sp-worker/siddhi -n vick-system
     kubectl create configmap sp-worker-conf --from-file=${download_location}/sp-worker/conf -n vick-system
@@ -344,7 +344,7 @@ function deploy_sp_dashboard_worker () {
     kubectl apply -f ${download_location}/vick-sp-dashboard-ingress.yaml -n vick-system
 }
 function init_control_plane () {
-    download_location=$1
+    local download_location=$1
     #Setup VICK namespace, create service account and the docker registry credentials
     kubectl apply -f ${download_location}/vick-ns-init.yaml
 
@@ -357,7 +357,7 @@ function init_control_plane () {
 }
 
 function deploy_istio () {
-    download_location=$1
+    local download_location=$1
     istio_version=$2
     ISTIO_HOME=${download_location}/istio-${istio_version}
     wget https://github.com/istio/istio/releases/download/${istio_version}/istio-${istio_version}-linux.tar.gz -P ${download_location}
@@ -373,7 +373,7 @@ function deploy_istio () {
 }
 
 function deploy_vick_crds () {
-    download_location=$1
+    local download_location=$1
     #Install VICK crds
     kubectl apply -f ${download_location}/vick.yaml
 }
@@ -510,12 +510,16 @@ init_control_plane $download_path
 #Deploy/Configure NFS APIM artifact
 read -p "Do you want to deploy NFS server [Y/n]: " install_nfs < /dev/tty
 
-if [ $install_nfs == "Y" ] && [ $iaas == "GCP" ]; then
-    create_nfs_share_gcp "data"
-elif [ $install_nfs == "Y" ] && [ $iaas == "kubeadm" ]; then
-    echo "Kubeadmin based setup does not require a NFS server"
-else
-    read_nfs_connection
+if [ $install_nfs == "Y" ]; then
+    if [ $iaas == "GCP" ]; then
+        create_nfs_share_gcp "data"
+    elif [ $iaas == "kubeadm" ]; then
+        echo "Kubeadm based setup does not require a NFS server"
+    fi
+elif [ $install_nfs == "n" ]; then
+    if [ $iaas != "kubeadm" ]; then
+         read_nfs_connection
+    fi
 fi
 update_apim_nfs_volumes $download_path
 
