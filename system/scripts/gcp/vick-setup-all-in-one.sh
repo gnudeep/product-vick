@@ -522,10 +522,12 @@ if [ $install_mysql == "Y" ] && [ $iaas == "GCP" ]; then
     #Read db user / passwd
     read_control_plane_datasources_configs
     #Update the sql
+    update_control_plance_sql
     deploy_mysql_server_gcp $download_path "vick-mysql-9"
 elif [ $install_mysql == "Y" ] && [ $iaas == "kubeadm" ]; then
     read_control_plane_datasources_configs
     #update the sql file
+    update_control_plance_sql
     deploy_mysql_server $download_path
 else
     read_control_plane_datasources_configs
