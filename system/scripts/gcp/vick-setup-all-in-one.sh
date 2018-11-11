@@ -245,12 +245,13 @@ function deploy_mysql_server_gcp () {
 function read_control_plane_datasources_configs () {
     local db_user
     local db_passwd
-    local db_name
+    local db_hostname="wso2apim-with-analytics-rdbms-service"
 
     if [ $iaas == "kubeadm" ]; then
     echo "Configuring remote MySQL server"
-    read -p "Database host name: " db_hostname < /dev/tty
+    #read -p "Database host name: " db_hostname < /dev/tty
         if [[ ! -z "${db_hostname/ //}" ]]; then
+                echo "Db Hostname ${db_hostname}"
                 config_params["MYSQL_DATABASE_HOST"]=$db_hostname
         fi
     fi
@@ -493,6 +494,7 @@ if [ $iaas == "GCP" ]; then
     echo "GCP selected"
     install_k8s_gcp $gcp_project
 elif [ $iaas == "kubeadm" ]; then
+     echo "kubeadm selected"
     install_k8s_kubeadm $k8s_version
     #configure master node
     configure_k8s_kubeadm
