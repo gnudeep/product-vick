@@ -106,7 +106,7 @@ fi
 
 #Create new NFS share
 function create_nfs_share_gcp () {
-echo "Creating NFS share"
+echo "Creating NFS share in GCP"
 local nfs_share_location=$1
 local nfs_server_ip
 
@@ -388,8 +388,8 @@ function create_artifact_folder () {
 }
 function download_vick_artifacts () {
 
-    base_url=$1
-    download_path=$2
+    local base_url=$1
+    local download_path=$2
     yaml_list=("$@")
 
     for file_path in "${yaml_list[@]}"
@@ -512,6 +512,8 @@ read -p "Do you want to deploy NFS server [Y/n]: " install_nfs < /dev/tty
 
 if [ $install_nfs == "Y" ] && [ $iaas == "GCP" ]; then
     create_nfs_share_gcp "data"
+elif [ $install_nfs == "Y" ] && [ $iaas == "kubeadm" ]; then
+    echo "Kubeadmin based setup does not require a NFS server"
 else
     read_nfs_connection
 fi
