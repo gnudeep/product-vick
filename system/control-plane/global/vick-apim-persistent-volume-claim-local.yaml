@@ -25,4 +25,4 @@ spec:
   storageClassName: "local-storage"
   selector:
     matchLabels:
-      purpose: apim-deployment-data
+      purpose: apim-repository-deployment-server

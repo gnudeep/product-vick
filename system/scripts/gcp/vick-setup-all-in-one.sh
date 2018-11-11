@@ -269,7 +269,7 @@ function update_control_plance_sql () {
 local download_location=$1
     for param in "${!config_params[@]}"
     do
-        sed -i '' "s/$param/${config_params[$param]}/g" ${download_location}/mysql/dbscripts/init.sql
+        sed -i "s/$param/${config_params[$param]}/g" ${download_location}/mysql/dbscripts/init.sql
     done
 
 }
@@ -279,10 +279,10 @@ function update_control_plane_datasources () {
     local download_location=$1
     for param in "${!config_params[@]}"
     do
-        sed -i '' "s/$param/${config_params[$param]}/g" ${download_location}/apim-configs/pub-store/datasources/master-datasources.xml
-        sed -i '' "s/$param/${config_params[$param]}/g" ${download_location}/apim-configs/gw/datasources/master-datasources.xml
-        sed -i '' "s/$param/${config_params[$param]}/g" ${download_location}/sp-worker/conf/deployment.yaml
-        sed -i '' "s/$param/${config_params[$param]}/g" ${download_location}/sp-dashboard/conf/deployment.yaml
+        sed -i "s/$param/${config_params[$param]}/g" ${download_location}/apim-configs/pub-store/datasources/master-datasources.xml
+        sed -i "s/$param/${config_params[$param]}/g" ${download_location}/apim-configs/gw/datasources/master-datasources.xml
+        sed -i "s/$param/${config_params[$param]}/g" ${download_location}/sp-worker/conf/deployment.yaml
+        sed -i "s/$param/${config_params[$param]}/g" ${download_location}/sp-dashboard/conf/deployment.yaml
     done
 }
 
@@ -530,12 +530,12 @@ if [ $install_mysql == "Y" ] && [ $iaas == "GCP" ]; then
     #Read db user / passwd
     read_control_plane_datasources_configs
     #Update the sql
-    update_control_plance_sql
+    update_control_plance_sql $download_path
     deploy_mysql_server_gcp $download_path "vick-mysql-9"
 elif [ $install_mysql == "Y" ] && [ $iaas == "kubeadm" ]; then
     read_control_plane_datasources_configs
     #update the sql file
-    update_control_plance_sql
+    update_control_plance_sql $download_path
     deploy_mysql_server $download_path
 else
     read_control_plane_datasources_configs
