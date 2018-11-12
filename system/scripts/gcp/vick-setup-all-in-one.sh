@@ -301,7 +301,7 @@ function deploy_global_gw () {
         sudo chown 802:802 /mnt/apim_repository_deployment_server
         #Create apim local volumes and volume claims
         kubectl apply -f ${download_location}/vick-apim-persistent-volumes-local.yaml -n vick-system
-        kubectl apply -f ${download_location}/vick-apim-artifacts-persistent-volume-claim.yaml -n vick-system
+        kubectl apply -f ${download_location}/vick-apim-persistent-volume-claim-local.yaml -n vick-system
     elif [ $iaas == "GCP" ]; then
         #Create apim NFS volumes and volume claims
         kubectl apply -f ${download_location}/vick-apim-artifacts-persistent-volumes.yaml -n vick-system
