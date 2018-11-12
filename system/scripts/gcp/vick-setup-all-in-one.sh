@@ -379,7 +379,7 @@ function deploy_vick_crds () {
 }
 
 function create_artifact_folder () {
- tmp_folder=$1
+ local tmp_folder=$1
  if [ -d $tmp_folder ]; then
         mv $tmp_folder ${tmp_folder}.$(date +%s)
     fi
@@ -402,6 +402,18 @@ function download_vick_artifacts () {
     done
 }
 
+function install_nginx_ingress_kubeadm () {
+    local download_location=$1
+    #Install nginx-ingress for control plane ingress
+    kubectl apply -f ${download_location}/mandatory.yaml
+    kubectl apply -f ${download_location}/service-nodeport.yaml
+}
+
+function install_nginx_ingress_gcp () {
+    local download_location=$1
+    #Install nginx-ingress for control plane ingress
+    kubectl apply -f ${download_location}/mandatory.yaml
+}
 #-----------------------------------------------------------------------------------------------------------------------
 #Get the IaaS type form the user
 iaas=$1
@@ -443,6 +455,8 @@ control_plane_yaml=(
     "vick-sp-worker-service.yaml"
     "vick-apim-artifacts-persistent-volumes.yaml"
     "vick-apim-artifacts-persistent-volume-claim.yaml"
+    "mandatory.yaml"
+    "service-nodeport.yaml"
     "apim-configs/gw/datasources/master-datasources.xml"
     "apim-configs/gw/user-mgt.xml"
     "apim-configs/gw/identity/identity.xml"
@@ -554,6 +568,14 @@ echo "Deploying Istio"
 
 deploy_istio $download_path $istio_version
 
-echo "Deploy vick crds"
+echo "Deploying vick crds"
 
 deploy_vick_crds $download_path
+
+echo "Deploying nginx-ingress"
+
+if [ $iaas == "kubeadm" ]; then
+    install_nginx_ingress_kubeadm $download_path
+fi
+#check GCP ingress
+
